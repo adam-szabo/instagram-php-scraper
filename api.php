@@ -31,11 +31,23 @@ switch (strtolower($_GET['action'])) {
         // Execute
         try {
             $account = Instagram::getAccount($_GET['username']);
-            echo json_encode($account, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            $accountDto = [];
+            $accountDto['id'] = $account->getId();
+            $accountDto['username'] = $account->getUsername();
+            $accountDto['fullName'] = $account->getFullName();
+            $accountDto['followsCount'] = $account->getFollowsCount();
+            $accountDto['followedByCount'] = $account->getFollowedByCount();
+            $accountDto['profilePicUrl'] = $account->getProfilePicUrl();
+            $accountDto['biography'] = $account->getBiography();
+            $accountDto['mediaCount'] = $account->getMediaCount();
+            $accountDto['isPrivate'] = $account->IsPrivate();
+            $accountDto['isVerified'] = $account->IsVerified();
+            $accountDto['externalUrl'] = $account->getExternalUrl();
+            echo json_encode($accountDto, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
             return;
-        } catch (InstagramException $e) {
+        } catch (InstagramScraper\Exception\InstagramException $e) {
             http_response_code(500);
-            echo json_encode($e, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            echo json_encode($e->getMessage(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
             return;
         }
         break;
@@ -78,10 +90,45 @@ switch (strtolower($_GET['action'])) {
             $followers = $instagram->getFollowers($account->getId(), $_GET['count'], $_GET['page_size'], true);
             echo json_encode($followers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
             return;
-        } catch (InstagramException $e) {
+        } catch (InstagramScraper\Exception\InstagramException $e) {
             http_response_code(500);
-            echo json_encode($e, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            echo json_encode($e->getMessage(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
             return;
+        }
+        break;
+
+    // ?action=get_last_activity_date&username=USERNAME
+    case 'get_last_activity_date':
+        // Validate input
+        if (empty($_GET['username'])) {
+            http_response_code(400);
+            echo json_encode('Missing query parameter "username".', JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            return;
+        }
+
+        // Execute
+        try {
+            $medias = Instagram::getMedias($_GET['username'], 1);
+            if (empty($medias)) {
+                $createdTime = null;
+            }
+            else {
+                $createdTime = gmdate('Y-m-d H:i:s', $medias[0]->getCreatedTime());
+                $createdTime = str_replace(' ', 'T', $createdTime) . 'Z';
+            }
+            echo json_encode($createdTime, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            return;
+        } catch (InstagramScraper\Exception\InstagramException $e) {
+            if (strpos($e->getMessage(), 'Response code is 404.') === 0) {
+                http_response_code(404);
+                echo json_encode('Username "' . $_GET['username'] . '" not found.', JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                return;
+            }
+            else {
+                http_response_code(500);
+                echo json_encode($e->getMessage(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                return;
+            }
         }
         break;
 
